@@ -10,6 +10,13 @@ export interface TimerConfig {
   turnBased?: boolean
   /** [active-partner role, other-partner role], e.g. ['striking the pads', 'holding pads & calling combos']. */
   roles?: [string, string]
+  /**
+   * Named sub-phases that play in sequence within a single round (e.g. warm-up: jump rope → mobility → shadowboxing).
+   * Durations should sum to workSec. The timer auto-advances between them and announces each one.
+   */
+  segments?: { label: string; sec: number }[]
+  /** Cyclic exercise names for each round, e.g. a 6-exercise circuit run for 18 total rounds. Shown alongside "Round N / total". */
+  roundLabels?: string[]
 }
 
 export interface SessionTask {

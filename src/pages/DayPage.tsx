@@ -140,6 +140,8 @@ export function DayPage() {
           modeLabel={activeTimer.cfg.label}
           turnBased={activeTimer.mode === 'team' && activeTimer.cfg.turnBased}
           roles={activeTimer.cfg.roles}
+          segments={activeTimer.cfg.segments}
+          roundLabels={activeTimer.cfg.roundLabels}
           myName={myName}
           partnerName={partnerName}
           onClose={() => setActiveTimer(null)}

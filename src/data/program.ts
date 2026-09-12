@@ -10,21 +10,51 @@ const warmup = (): SessionTask => ({
   id: PLACEHOLDER_ID,
   label: 'Warm-up',
   description: 'Jump rope or jog in place (3 min) → arm/hip circles, leg swings, neck rolls → 2 min loose shadowboxing.',
-  solo: { workSec: 8 * 60, restSec: 0, rounds: 1, label: 'Warm-up' },
+  solo: {
+    workSec: 8 * 60,
+    restSec: 0,
+    rounds: 1,
+    label: 'Warm-up',
+    segments: [
+      { label: 'Jump rope or jog in place', sec: 3 * 60 },
+      { label: 'Arm & hip circles, leg swings, neck rolls', sec: 3 * 60 },
+      { label: 'Loose shadowboxing', sec: 2 * 60 },
+    ],
+  },
 })
 
 const cooldown = (): SessionTask => ({
   id: PLACEHOLDER_ID,
   label: 'Cooldown',
   description: 'Static stretch — hamstrings, hips, shoulders, calves — then 1–2 min of slow breathing.',
-  solo: { workSec: 8 * 60, restSec: 0, rounds: 1, label: 'Cooldown' },
+  solo: {
+    workSec: 8 * 60,
+    restSec: 0,
+    rounds: 1,
+    label: 'Cooldown',
+    segments: [
+      { label: 'Stretch — hamstrings', sec: 2 * 60 },
+      { label: 'Stretch — hips', sec: 2 * 60 },
+      { label: 'Stretch — shoulders', sec: 2 * 60 },
+      { label: 'Stretch — calves', sec: 60 },
+      { label: 'Slow breathing', sec: 60 },
+    ],
+  },
 })
+
+const CIRCUIT_EXERCISES = ['Squats', 'Push-ups', 'Mountain climbers', 'Plank hold', 'Jumping jacks', 'Glute bridges']
 
 const conditioningCircuit = (): SessionTask => ({
   id: PLACEHOLDER_ID,
   label: 'Conditioning circuit',
   description: 'Squats, push-ups, mountain climbers, plank hold, jumping jacks, glute bridges — 3 rounds through, 30s on / 15s off. Do it side by side.',
-  solo: { workSec: 30, restSec: 15, rounds: 18, label: 'Circuit' },
+  solo: {
+    workSec: 30,
+    restSec: 15,
+    rounds: CIRCUIT_EXERCISES.length * 3,
+    label: 'Circuit',
+    roundLabels: CIRCUIT_EXERCISES,
+  },
 })
 
 interface TechniqueOpts {
