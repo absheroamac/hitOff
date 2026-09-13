@@ -120,6 +120,10 @@ export function RoundTimer({
   const total = phase === 'work' ? (currentSegment?.sec ?? workSec) : restSec
   const progress = phase === 'done' ? 1 : 1 - remaining / (total || 1)
   const currentRoundLabel = roundLabels?.[(round - 1) % roundLabels.length]
+  const segmentsRemainingSec =
+    segments && phase === 'work'
+      ? Math.max(remaining, 0) + segments.slice(segmentIndex + 1).reduce((sum, s) => sum + s.sec, 0)
+      : 0
 
   // Round 1 = you, round 2 = partner, round 3 = you, ... so pad time comes out equal.
   const isMyTurn = round % 2 === 1
@@ -135,7 +139,11 @@ export function RoundTimer({
         ✕
       </button>
 
-      {turnBased ? (
+      {segments ? (
+        <div className="text-sm uppercase tracking-widest text-white/50 mb-1">
+          Step {segmentIndex + 1} / {segments.length}
+        </div>
+      ) : turnBased ? (
         <div className="text-sm uppercase tracking-widest text-white/50 mb-1 text-center">
           {activeName}'s turn — round {yourTurnNumber} / {rounds}
         </div>
@@ -170,10 +178,26 @@ export function RoundTimer({
       {currentSegment && phase === 'work' && (
         <div className="text-2xl font-bold text-white mb-1 text-center px-4">{currentSegment.label}</div>
       )}
+      {currentSegment && phase === 'work' && (
+        <div className="text-white/40 text-xs mb-1 text-center px-4">{formatTime(segmentsRemainingSec)} left overall</div>
+      )}
       {segments && phase === 'work' && segmentIndex < segments.length - 1 && (
         <div className="text-white/40 text-sm mb-3 text-center px-4">Up next: {segments[segmentIndex + 1].label}</div>
       )}
       {!(currentSegment && phase === 'work') && <div className="mb-3" />}
+
+      {segments && phase !== 'done' && (
+        <div className="flex gap-1.5 mb-3">
+          {segments.map((s, i) => (
+            <div
+              key={s.label}
+              className={`h-1.5 w-6 rounded-full ${
+                i < segmentIndex ? 'bg-emerald-400' : i === segmentIndex ? 'bg-emerald-400/60' : 'bg-white/15'
+              }`}
+            />
+          ))}
+        </div>
+      )}
 
       {phase === 'rest' && turnBased && round < totalRounds && (
         <div className="text-amber-300 font-semibold mb-5 text-center animate-pulse">
