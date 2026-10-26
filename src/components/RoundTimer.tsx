@@ -63,6 +63,7 @@ export function RoundTimer({
   const [remaining, setRemaining] = useState(segments?.[0]?.sec ?? workSec)
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
   const [showGuide, setShowGuide] = useState(false)
+  const [guideStep, setGuideStep] = useState(0)
   const intervalRef = useRef<number | null>(null)
 
   // Unlock audio on initial mount / user touch
@@ -366,57 +367,89 @@ export function RoundTimer({
         </div>
       )}
 
-      {showGuide && guide && (
-        <div
-          className="fixed inset-0 z-60 bg-black/90 p-5 flex flex-col items-center justify-center animate-fadeIn"
-          onClick={() => setShowGuide(false)}
-        >
+      {showGuide && guide && (() => {
+        const hasSteps = Boolean(guide.steps && guide.steps.length > 1)
+        const currentStep = hasSteps ? guide.steps![guideStep] : null
+        const activeImageUrl = currentStep?.imageUrl ?? guide.imageUrl
+        const activeTitle = currentStep ? `Step ${currentStep.stepNumber}: ${currentStep.label}` : guide.title
+
+        return (
           <div
-            className="w-full max-w-md bg-[#0e0e18] border border-white/20 rounded-2xl p-4 shadow-2xl overflow-y-auto max-h-[85vh]"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 z-60 bg-black/90 p-5 flex flex-col items-center justify-center animate-fadeIn"
+            onClick={() => setShowGuide(false)}
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-base">👁️</span>
-                <h3 className="text-sm font-bold text-white uppercase tracking-wide">{guide.title}</h3>
+            <div
+              className="w-full max-w-md bg-[#0e0e18] border border-white/20 rounded-2xl p-4 shadow-2xl overflow-y-auto max-h-[85vh]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-base shrink-0">👁️</span>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wide truncate">{activeTitle}</h3>
+                </div>
+                <button
+                  onClick={() => setShowGuide(false)}
+                  className="text-white/60 hover:text-white text-lg p-1 shrink-0"
+                  aria-label="Close form guide"
+                >
+                  ✕
+                </button>
               </div>
+
+              {hasSteps && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2 scrollbar-none border-b border-white/10">
+                  {guide.steps!.map((step, idx) => (
+                    <button
+                      key={step.stepNumber}
+                      onClick={() => setGuideStep(idx)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all ${
+                        guideStep === idx
+                          ? 'bg-emerald-500 text-black shadow-sm'
+                          : 'bg-white/5 text-white/60 hover:text-white'
+                      }`}
+                    >
+                      {step.stepNumber}. {step.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative overflow-hidden rounded-xl mb-3">
+                <img
+                  src={activeImageUrl}
+                  alt={activeTitle}
+                  className="w-full aspect-video object-cover rounded-xl border border-emerald-500/30"
+                />
+                {hasSteps && (
+                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/80 backdrop-blur-sm text-[10px] text-emerald-400 font-bold border border-emerald-500/30">
+                    Step {guideStep + 1} of {guide.steps!.length}
+                  </div>
+                )}
+              </div>
+
+              <div className="text-xs text-emerald-400 font-semibold mb-2">
+                💡 {currentStep?.cue ? currentStep.cue : guide.keyFocus}
+              </div>
+
+              <div className="space-y-1.5 border-t border-white/10 pt-2.5 mb-3.5">
+                {guide.cues.map((c, i) => (
+                  <div key={i} className="text-xs text-white/70 flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                    <span>{c}</span>
+                  </div>
+                ))}
+              </div>
+
               <button
                 onClick={() => setShowGuide(false)}
-                className="text-white/60 hover:text-white text-lg p-1"
-                aria-label="Close form guide"
+                className="w-full py-2.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all"
               >
-                ✕
+                Back to Timer
               </button>
             </div>
-
-            <img
-              src={guide.imageUrl}
-              alt={guide.title}
-              className="w-full aspect-video object-cover rounded-xl border border-emerald-500/30 mb-3"
-            />
-
-            <div className="text-xs text-emerald-400 font-semibold mb-2">
-              💡 Key Focus: <span className="text-white/80 font-normal">{guide.keyFocus}</span>
-            </div>
-
-            <div className="space-y-1.5 border-t border-white/10 pt-2.5 mb-3.5">
-              {guide.cues.map((c, i) => (
-                <div key={i} className="text-xs text-white/70 flex items-start gap-2">
-                  <span className="text-emerald-400 font-bold shrink-0">✓</span>
-                  <span>{c}</span>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setShowGuide(false)}
-              className="w-full py-2.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all"
-            >
-              Back to Timer
-            </button>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
