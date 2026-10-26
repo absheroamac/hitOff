@@ -9,6 +9,7 @@ import {
   isSoundEnabled,
   setSoundEnabled,
 } from '../lib/sound'
+import type { VisualGuide } from '../data/visualGuides'
 
 interface RoundTimerProps {
   workSec: number
@@ -24,6 +25,7 @@ interface RoundTimerProps {
   segments?: { label: string; sec: number }[]
   /** Cyclic exercise names for each round (e.g. circuit movements), shown alongside the round counter. */
   roundLabels?: string[]
+  guide?: VisualGuide
   onClose: () => void
   onComplete?: () => void
   onSkip?: () => void
@@ -48,6 +50,7 @@ export function RoundTimer({
   partnerName = 'Partner',
   segments,
   roundLabels,
+  guide,
   onClose,
   onComplete,
   onSkip,
@@ -59,6 +62,7 @@ export function RoundTimer({
   const [segmentIndex, setSegmentIndex] = useState(0)
   const [remaining, setRemaining] = useState(segments?.[0]?.sec ?? workSec)
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
+  const [showGuide, setShowGuide] = useState(false)
   const intervalRef = useRef<number | null>(null)
 
   // Unlock audio on initial mount / user touch
@@ -186,14 +190,29 @@ export function RoundTimer({
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 text-white px-6">
       {/* Top Header Actions */}
       <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
-        <button
-          onClick={toggleSound}
-          className="text-white/60 hover:text-white transition-colors p-2 rounded-full bg-white/5 flex items-center gap-1.5 text-xs font-medium"
-          title={soundOn ? 'Sound is on — tap to mute' : 'Sound is muted — tap to unmute'}
-        >
-          <span className="text-base">{soundOn ? '🔊' : '🔇'}</span>
-          <span className="hidden sm:inline">{soundOn ? 'Sound On' : 'Muted'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleSound}
+            className="text-white/60 hover:text-white transition-colors p-2 rounded-full bg-white/5 flex items-center gap-1.5 text-xs font-medium"
+            title={soundOn ? 'Sound is on — tap to mute' : 'Sound is muted — tap to unmute'}
+          >
+            <span className="text-base">{soundOn ? '🔊' : '🔇'}</span>
+            <span className="hidden sm:inline">{soundOn ? 'Sound On' : 'Muted'}</span>
+          </button>
+
+          {guide && (
+            <button
+              onClick={() => setShowGuide((s) => !s)}
+              className={`p-2 rounded-full transition-all text-xs font-medium flex items-center gap-1.5 ${
+                showGuide ? 'bg-emerald-500 text-black font-semibold' : 'bg-white/5 text-white/70 hover:text-white'
+              }`}
+              title="Visual Form Guide"
+            >
+              <span>👁️</span>
+              <span className="hidden sm:inline">Form Guide</span>
+            </button>
+          )}
+        </div>
 
         <button
           onClick={onClose}
@@ -344,6 +363,58 @@ export function RoundTimer({
           >
             Done
           </button>
+        </div>
+      )}
+
+      {showGuide && guide && (
+        <div
+          className="fixed inset-0 z-60 bg-black/90 p-5 flex flex-col items-center justify-center animate-fadeIn"
+          onClick={() => setShowGuide(false)}
+        >
+          <div
+            className="w-full max-w-md bg-[#0e0e18] border border-white/20 rounded-2xl p-4 shadow-2xl overflow-y-auto max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">👁️</span>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wide">{guide.title}</h3>
+              </div>
+              <button
+                onClick={() => setShowGuide(false)}
+                className="text-white/60 hover:text-white text-lg p-1"
+                aria-label="Close form guide"
+              >
+                ✕
+              </button>
+            </div>
+
+            <img
+              src={guide.imageUrl}
+              alt={guide.title}
+              className="w-full aspect-video object-cover rounded-xl border border-emerald-500/30 mb-3"
+            />
+
+            <div className="text-xs text-emerald-400 font-semibold mb-2">
+              💡 Key Focus: <span className="text-white/80 font-normal">{guide.keyFocus}</span>
+            </div>
+
+            <div className="space-y-1.5 border-t border-white/10 pt-2.5 mb-3.5">
+              {guide.cues.map((c, i) => (
+                <div key={i} className="text-xs text-white/70 flex items-start gap-2">
+                  <span className="text-emerald-400 font-bold shrink-0">✓</span>
+                  <span>{c}</span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowGuide(false)}
+              className="w-full py-2.5 rounded-full bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all"
+            >
+              Back to Timer
+            </button>
+          </div>
         </div>
       )}
     </div>

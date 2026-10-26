@@ -6,6 +6,8 @@ import { useAuth } from '../lib/AuthContext'
 import { useProfiles } from '../lib/useProfiles'
 import { useSkipped } from '../lib/useSkipped'
 import { RoundTimer } from '../components/RoundTimer'
+import { VisualGuideAccordion } from '../components/VisualGuideAccordion'
+import { getVisualGuideForTask } from '../data/visualGuides'
 import { unlockAudio } from '../lib/sound'
 import type { SessionTask, TimerConfig } from '../data/types'
 
@@ -135,6 +137,7 @@ export function DayPage() {
             const others = profiles.filter((p) => p.id !== user?.id && isDone(week.weekNumber, day.id, task.id, p.id))
             const cfg = task[mode] ?? task.solo ?? task.team
             const effectiveMode: Mode = !task[mode] && cfg ? (task.solo ? 'solo' : 'team') : mode
+            const guide = getVisualGuideForTask(task.label, task.description)
 
             const handleToggleCompletion = () => {
               if (skipped) {
@@ -203,6 +206,9 @@ export function DayPage() {
                         ✓ {others.map((o) => o.display_name).join(', ')} done
                       </div>
                     )}
+
+                    {/* Expandable Visual Form Guide Accordion */}
+                    <VisualGuideAccordion guide={guide} />
 
                     {/* Actions Row */}
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -280,6 +286,7 @@ export function DayPage() {
           roles={activeTimer.cfg.roles}
           segments={activeTimer.cfg.segments}
           roundLabels={activeTimer.cfg.roundLabels}
+          guide={getVisualGuideForTask(activeTimer.task.label, activeTimer.task.description)}
           myName={myName}
           partnerName={partnerName}
           onClose={() => setActiveTimer(null)}
