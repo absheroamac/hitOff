@@ -78,5 +78,73 @@ export function useCompletions() {
     [completions, user, refresh],
   )
 
-  return { completions, loading, isDone, toggle, refresh }
+  const markDone = useCallback(
+    async (weekNumber: number, dayId: string, taskId: string, mode: CompletionMode, participantIds: string[]) => {
+      if (!user) return
+      const targetIds = mode === 'team' ? Array.from(new Set([user.id, ...participantIds])) : [user.id]
+      await Promise.all(
+        targetIds.map((id) =>
+          supabase.from('completions').upsert(
+            { user_id: id, week_number: weekNumber, day_id: dayId, task_id: taskId, mode },
+            { onConflict: 'user_id,week_number,day_id,task_id' },
+          ),
+        ),
+      )
+      await refresh()
+    },
+    [user, refresh],
+  )
+
+  const markUndone = useCallback(
+    async (weekNumber: number, dayId: string, taskId: string, mode: CompletionMode, participantIds: string[]) => {
+      if (!user) return
+      const targetIds = mode === 'team' ? Array.from(new Set([user.id, ...participantIds])) : [user.id]
+      await Promise.all(
+        targetIds.map((id) =>
+          supabase.from('completions').delete().match({ user_id: id, week_number: weekNumber, day_id: dayId, task_id: taskId }),
+        ),
+      )
+      await refresh()
+    },
+    [user, refresh],
+  )
+
+  const markAllDone = useCallback(
+    async (weekNumber: number, dayId: string, taskIds: string[], mode: CompletionMode, participantIds: string[]) => {
+      if (!user || taskIds.length === 0) return
+      const targetIds = mode === 'team' ? Array.from(new Set([user.id, ...participantIds])) : [user.id]
+      const rows = targetIds.flatMap((id) =>
+        taskIds.map((taskId) => ({
+          user_id: id,
+          week_number: weekNumber,
+          day_id: dayId,
+          task_id: taskId,
+          mode,
+        })),
+      )
+      await supabase.from('completions').upsert(rows, { onConflict: 'user_id,week_number,day_id,task_id' })
+      await refresh()
+    },
+    [user, refresh],
+  )
+
+  const unmarkAllDone = useCallback(
+    async (weekNumber: number, dayId: string, taskIds: string[], mode: CompletionMode, participantIds: string[]) => {
+      if (!user || taskIds.length === 0) return
+      const targetIds = mode === 'team' ? Array.from(new Set([user.id, ...participantIds])) : [user.id]
+      await Promise.all(
+        targetIds.map((id) =>
+          supabase
+            .from('completions')
+            .delete()
+            .match({ user_id: id, week_number: weekNumber, day_id: dayId })
+            .in('task_id', taskIds),
+        ),
+      )
+      await refresh()
+    },
+    [user, refresh],
+  )
+
+  return { completions, loading, isDone, toggle, markDone, markUndone, markAllDone, unmarkAllDone, refresh }
 }

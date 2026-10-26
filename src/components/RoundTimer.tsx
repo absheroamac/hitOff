@@ -1,4 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import {
+  playTimerStartSound,
+  playTimerEndSound,
+  playRestSound,
+  playSegmentSound,
+  playCountdownTick,
+  unlockAudio,
+  isSoundEnabled,
+  setSoundEnabled,
+} from '../lib/sound'
 
 interface RoundTimerProps {
   workSec: number
@@ -16,24 +26,10 @@ interface RoundTimerProps {
   roundLabels?: string[]
   onClose: () => void
   onComplete?: () => void
+  onSkip?: () => void
 }
 
 type Phase = 'work' | 'rest' | 'done'
-
-function beep(freq: number, durationMs: number) {
-  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-  const ctx = new AudioCtx()
-  const osc = ctx.createOscillator()
-  const gain = ctx.createGain()
-  osc.frequency.value = freq
-  osc.connect(gain)
-  gain.connect(ctx.destination)
-  gain.gain.setValueAtTime(0.2, ctx.currentTime)
-  osc.start()
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000)
-  osc.stop(ctx.currentTime + durationMs / 1000)
-  osc.onended = () => ctx.close()
-}
 
 function formatTime(sec: number) {
   const m = Math.floor(sec / 60)
@@ -54,6 +50,7 @@ export function RoundTimer({
   roundLabels,
   onClose,
   onComplete,
+  onSkip,
 }: RoundTimerProps) {
   const totalRounds = turnBased ? rounds * 2 : rounds
   const [running, setRunning] = useState(false)
@@ -61,7 +58,56 @@ export function RoundTimer({
   const [phase, setPhase] = useState<Phase>('work')
   const [segmentIndex, setSegmentIndex] = useState(0)
   const [remaining, setRemaining] = useState(segments?.[0]?.sec ?? workSec)
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled())
   const intervalRef = useRef<number | null>(null)
+
+  // Unlock audio on initial mount / user touch
+  useEffect(() => {
+    unlockAudio()
+  }, [])
+
+  const toggleSound = () => {
+    const next = !soundOn
+    setSoundOn(next)
+    setSoundEnabled(next)
+    if (next) unlockAudio()
+  }
+
+  const advanceRound = useCallback(() => {
+    if (round >= totalRounds) {
+      playTimerEndSound()
+      setPhase('done')
+      setRunning(false)
+      onComplete?.()
+    } else {
+      playTimerStartSound()
+      setRound((r) => r + 1)
+      setPhase('work')
+      setSegmentIndex(0)
+      setRemaining(segments?.[0]?.sec ?? workSec)
+    }
+  }, [round, totalRounds, segments, workSec, onComplete])
+
+  const advancePhaseOrSegment = useCallback(() => {
+    if (phase === 'work' && segments && segmentIndex < segments.length - 1) {
+      playSegmentSound()
+      setSegmentIndex((i) => i + 1)
+      setRemaining(segments[segmentIndex + 1].sec)
+      return
+    }
+
+    if (phase === 'work') {
+      if (restSec > 0) {
+        playRestSound()
+        setPhase('rest')
+        setRemaining(restSec)
+      } else {
+        advanceRound()
+      }
+    } else if (phase === 'rest') {
+      advanceRound()
+    }
+  }, [phase, segments, segmentIndex, restSec, advanceRound])
 
   useEffect(() => {
     if (!running) return
@@ -75,46 +121,49 @@ export function RoundTimer({
 
   useEffect(() => {
     if (remaining > 0) {
-      if (remaining <= 3 && running) beep(660, 120)
+      if (remaining <= 3 && running) playCountdownTick()
       return
     }
     if (!running) return
 
-    if (phase === 'work' && segments && segmentIndex < segments.length - 1) {
-      beep(550, 200)
-      setSegmentIndex((i) => i + 1)
-      setRemaining(segments[segmentIndex + 1].sec)
-      return
-    }
-
-    if (phase === 'work') {
-      if (restSec > 0) {
-        beep(440, 400)
-        setPhase('rest')
-        setRemaining(restSec)
-      } else {
-        advanceRound()
-      }
-    } else if (phase === 'rest') {
-      advanceRound()
-    }
-
-    function advanceRound() {
-      if (round >= totalRounds) {
-        beep(880, 600)
-        setPhase('done')
-        setRunning(false)
-        onComplete?.()
-      } else {
-        beep(880, 300)
-        setRound((r) => r + 1)
-        setPhase('work')
-        setSegmentIndex(0)
-        setRemaining(segments?.[0]?.sec ?? workSec)
-      }
-    }
+    advancePhaseOrSegment()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining])
+
+  const handleToggleRunning = () => {
+    unlockAudio()
+    if (!running) {
+      playTimerStartSound()
+    }
+    setRunning((r) => !r)
+  }
+
+  const handleSkipSegmentOrRound = () => {
+    unlockAudio()
+    if (phase === 'rest') {
+      advanceRound()
+    } else {
+      advancePhaseOrSegment()
+    }
+  }
+
+  const handleManualDone = () => {
+    unlockAudio()
+    playTimerEndSound()
+    setPhase('done')
+    setRunning(false)
+    onComplete?.()
+    setTimeout(() => {
+      onClose()
+    }, 600)
+  }
+
+  const handleSkipWorkout = () => {
+    if (onSkip) {
+      onSkip()
+    }
+    onClose()
+  }
 
   const currentSegment = segments?.[segmentIndex]
   const total = phase === 'work' ? (currentSegment?.sec ?? workSec) : restSec
@@ -135,9 +184,25 @@ export function RoundTimer({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 text-white px-6">
-      <button onClick={onClose} className="absolute top-6 right-6 text-white/60 text-2xl leading-none">
-        ✕
-      </button>
+      {/* Top Header Actions */}
+      <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
+        <button
+          onClick={toggleSound}
+          className="text-white/60 hover:text-white transition-colors p-2 rounded-full bg-white/5 flex items-center gap-1.5 text-xs font-medium"
+          title={soundOn ? 'Sound is on — tap to mute' : 'Sound is muted — tap to unmute'}
+        >
+          <span className="text-base">{soundOn ? '🔊' : '🔇'}</span>
+          <span className="hidden sm:inline">{soundOn ? 'Sound On' : 'Muted'}</span>
+        </button>
+
+        <button
+          onClick={onClose}
+          className="text-white/60 hover:text-white text-2xl leading-none p-2"
+          aria-label="Close timer"
+        >
+          ✕
+        </button>
+      </div>
 
       {segments ? (
         <div className="text-sm uppercase tracking-widest text-white/50 mb-1">
@@ -172,7 +237,7 @@ export function RoundTimer({
       </div>
 
       <div className="text-lg uppercase tracking-widest mb-1 text-white/70">
-        {phase === 'work' ? 'Work' : phase === 'rest' ? 'Rest' : 'Great job'}
+        {phase === 'work' ? 'Work' : phase === 'rest' ? 'Rest' : 'Great job!'}
       </div>
 
       {currentSegment && phase === 'work' && (
@@ -209,35 +274,78 @@ export function RoundTimer({
         <div className="text-white/35 text-xs text-center max-w-xs mb-6">{modeLabel}</div>
       )}
 
-      <div className="w-full max-w-xs h-2 bg-white/10 rounded-full overflow-hidden mb-10">
+      {/* Progress Bar */}
+      <div className="w-full max-w-xs h-2 bg-white/10 rounded-full overflow-hidden mb-8">
         <div
           className={`h-full transition-all duration-1000 ease-linear ${phase === 'work' ? 'bg-emerald-400' : 'bg-amber-400'}`}
           style={{ width: `${Math.min(progress, 1) * 100}%` }}
         />
       </div>
 
-      <div className="flex gap-4">
-        {phase !== 'done' && (
+      {/* Main Controls */}
+      {phase !== 'done' ? (
+        <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+          <div className="flex items-center justify-center gap-3 w-full">
+            <button
+              onClick={handleToggleRunning}
+              className="flex-1 py-3.5 px-6 rounded-full bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-black font-bold text-lg shadow-lg shadow-emerald-500/25 transition-all"
+            >
+              {running ? '⏸ Pause' : remaining === total ? '▶ Start' : '▶ Resume'}
+            </button>
+
+            <button
+              onClick={handleSkipSegmentOrRound}
+              className="py-3.5 px-4 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 text-white/90 font-semibold text-sm transition-all"
+              title={phase === 'rest' ? 'Skip rest period' : 'Skip to next round'}
+            >
+              {phase === 'rest' ? '⏭ Skip Rest' : '⏭ Skip'}
+            </button>
+
+            <button
+              onClick={() => {
+                setRunning(false)
+                setRound(1)
+                setPhase('work')
+                setSegmentIndex(0)
+                setRemaining(segments?.[0]?.sec ?? workSec)
+              }}
+              className="py-3.5 px-4 rounded-full border border-white/20 hover:bg-white/5 active:scale-95 text-white/70 text-sm transition-all"
+              title="Reset timer"
+            >
+              ↺
+            </button>
+          </div>
+
+          {/* Quick Complete / Skip Workout Options */}
+          <div className="flex items-center justify-between w-full pt-2 border-t border-white/10">
+            <button
+              onClick={handleManualDone}
+              className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 py-2 px-3 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 transition-all flex items-center gap-1.5"
+            >
+              ✓ Mark as Done
+            </button>
+
+            {onSkip && (
+              <button
+                onClick={handleSkipWorkout}
+                className="text-xs text-white/40 hover:text-white/80 py-2 px-3 rounded-full hover:bg-white/5 transition-all flex items-center gap-1"
+              >
+                ↷ Skip Workout
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <div className="text-emerald-400 text-sm font-semibold mb-2">🎉 Workout completed!</div>
           <button
-            onClick={() => setRunning((r) => !r)}
-            className="px-8 py-3 rounded-full bg-white text-black font-semibold text-lg"
+            onClick={onClose}
+            className="px-8 py-3 rounded-full bg-emerald-500 text-black font-bold text-base hover:bg-emerald-400 active:scale-95 transition-all"
           >
-            {running ? 'Pause' : remaining === total ? 'Start' : 'Resume'}
+            Done
           </button>
-        )}
-        <button
-          onClick={() => {
-            setRunning(false)
-            setRound(1)
-            setPhase('work')
-            setSegmentIndex(0)
-            setRemaining(segments?.[0]?.sec ?? workSec)
-          }}
-          className="px-6 py-3 rounded-full border border-white/30 text-white/80"
-        >
-          Reset
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   )
 }
